@@ -178,6 +178,7 @@ let gameOverReason = '';
 
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
+let activeCtx = ctx; // swapped to the title-art canvas while drawing the menu backdrop
 const stage = document.getElementById('stage');
 
 /* ---------------- Level (re)load ---------------- */
@@ -507,118 +508,167 @@ function resizeCanvas() {
 }
 window.addEventListener('resize', () => { if (grid) resizeCanvas(); });
 
-const COLORS = {
-  bg: '#0d0906',
-  dirt1: '#5a3a1e', dirt2: '#6b4626',
-  steel: '#4a4a52', steelDark: '#2c2c33',
-  brick: '#7a3b2e', brickDark: '#4a2016',
-  boulder: '#8d8d97', boulderDark: '#55555e', boulderHi: '#c8c8d4',
-  diamond: '#48e0ff', diamondHi: '#e8fdff',
-  exitClosed: '#3a2a10', exitOpen: '#ffd23f',
-  amoeba: '#3fbf5f',
-  player: '#ffcc33',
-  firefly: '#ff4d3d',
-  butterfly: '#7a6bff',
+/* ---------------- Title-screen backdrop (same pixel sprites, decorative) ---------------- */
+const titleCanvas = document.getElementById('title-art');
+const titleCtx = titleCanvas.getContext('2d');
+let titleTileSize = 32;
+
+function titleArtVisible() {
+  return !document.getElementById('screen-title').classList.contains('hidden') ||
+         !document.getElementById('screen-howto').classList.contains('hidden');
+}
+
+function renderTitleArt(frame) {
+  if (!titleArtVisible()) return;
+  const rect = titleCanvas.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  const wantW = Math.max(1, Math.round(rect.width * dpr));
+  const wantH = Math.max(1, Math.round(rect.height * dpr));
+  if (titleCanvas.width !== wantW || titleCanvas.height !== wantH) {
+    titleCanvas.width = wantW; titleCanvas.height = wantH;
+    titleTileSize = Math.max(20, Math.round(rect.width / 13));
+  }
+  activeCtx = titleCtx;
+  activeCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const w = rect.width, h = rect.height, ts = titleTileSize;
+  activeCtx.clearRect(0, 0, w, h);
+  const cols = Math.ceil(w / ts) + 1, rows = Math.ceil(h / ts) + 1;
+  for (let ry = 0; ry < rows; ry++) {
+    for (let rx = 0; rx < cols; rx++) {
+      const hash = Math.abs(Math.sin(rx * 12.9898 + ry * 78.233) * 43758.5453) % 1;
+      const px = rx * ts, py = ry * ts;
+      if (hash < 0.08) drawSprite(SPR.boulder, px, py, ts);
+      else if (hash < 0.16) drawSprite(SPR.diamond, px, py, ts, DIAMOND_SHIMMER[Math.floor(frame / 200 + rx + ry) % DIAMOND_SHIMMER.length]);
+      else drawDirt(px, py, ts, rx, ry);
+    }
+  }
+  activeCtx = ctx;
+}
+
+const COLORS = { bg: '#0d0906' };
+
+/* ---- Retro EGA-style pixel palette (8x8 sprite blocks, chunky like the original) ---- */
+const PALETTE = {
+  k: '#000000',            // outline
+  G: '#cfd2da', g: '#93969f', d: '#54565d',      // boulder hi / mid / shadow
+  C: '#3be2ff', c: '#0f8fb0', W: '#f2ffff',      // diamond cyan / deep facet / hi
+  R: '#b84a34', r: '#7a2f1f', M: '#1c0d06',      // brick / brick shadow / mortar
+  S: '#a7b0ba', s: '#5c6570', D: '#2a2f36',      // steel hi / mid / dark (rivets)
+  o1: '#6b4626', o2: '#5a3a1e', o3: '#4a2f18',   // dirt base / mid / dark flecks
+  Y: '#ffd400', y: '#c79a00',                    // helmet
+  n: '#f2c68a', x: '#3a2410',                    // face / visor-eyes
+  B: '#3059c9', b: '#1c3a8a',                    // suit
+  F: '#ff5540', f: '#a30f08',                    // firefly
+  P: '#9a7bff', p: '#5230c9',                    // butterfly
+  A: '#3ddc63', a: '#1f8f3d',                    // amoeba
+  E: '#ffd23f', e: '#5a3a10',                    // exit open / closed
 };
 
-function drawTile(t, px, py, ts, frame) {
-  if (t === T.EMPTY) return;
-  if (t === T.DIRT) {
-    ctx.fillStyle = COLORS.dirt1; ctx.fillRect(px, py, ts, ts);
-    ctx.fillStyle = COLORS.dirt2;
-    const sp = ts / 8;
-    for (let i = 0; i < 4; i++) {
-      const ox = ((i * 37 + px) % (ts - sp)) , oy = ((i * 59 + py) % (ts - sp));
-      ctx.fillRect(px + ox * 0.15 + sp, py + oy * 0.15 + sp, sp, sp);
+const SPR = {
+  boulder: ['..kkkk..', '.kGGGGk.', 'kGGGgggk', 'kGgggddk', 'kgggdddk', 'kgdddddk', '.kdddk..', '..kkkk..'],
+  diamond: ['...kk...', '..kCCk..', '.kCWWCk.', 'kCWWWWCk', 'kcWWWWck', '.kccCCk.', '..kCCk..', '...kk...'],
+  brick:   ['RRRRRRRR', 'RRRMRRRR', 'RRRRRRRR', 'MMMMMMMM', 'RRRRRRRR', 'RRRRRMRR', 'RRRRRRRR', 'MMMMMMMM'],
+  steel:   ['DssssssD', 'sSSSSSSs', 'sSssssSs', 'sSsSSsSs', 'sSsSSsSs', 'sSssssSs', 'sSSSSSSs', 'DssssssD'],
+  amoeba:  ['.AAAAAA.', 'AAaAAaAA', 'AAAAaAAA', 'aAAAAAAa', 'AAaAAAAA', 'AAAAaAAa', 'AAaAAAAA', '.AAAAAA.'],
+  exitOff: ['eeeeeeee', 'e......e', 'e.kkkk.e', 'e.k..k.e', 'e.k..k.e', 'e.kkkk.e', 'e......e', 'eeeeeeee'],
+  exitOn:  ['EEEEEEEE', 'E......E', 'E.kkkk.E', 'E.k..k.E', 'E.k..k.E', 'E.kkkk.E', 'E......E', 'EEEEEEEE'],
+  playerFront: ['..kYYk..', '.kYYYYk.', '.knnnnk.', 'kBBBBBBk', 'kBbBBbBk', '.kBBBBk.', '..kbbk..', '.kk..kk.'],
+  playerBack:  ['..kYYk..', '.kYYYYk.', '.kyyyyk.', 'kBBBBBBk', 'kBbBBbBk', '.kBBBBk.', '..kbbk..', '.kk..kk.'],
+  playerFront2:['..kYYk..', '.kYYYYk.', '.knnnnk.', 'kBBBBBBk', 'kBbBBbBk', '.kBBBBk.', '.kbk.kbk', 'kk.....k'],
+  firefly: ['..kffk..', '.kfFFfk.', 'kfFFFFfk', 'kFFkkFFk', 'kFFkkFFk', 'kfFFFFfk', '.kfFFfk.', '..kffk..'],
+  butterfly:['..kppk..', '.kpPPpk.', 'kpPPPPpk', 'kPPkkPPk', 'kPPkkPPk', 'kpPPPPpk', '.kpPPpk.', '..kppk..'],
+};
+
+function drawSprite(matrix, px, py, ts, overrides) {
+  const n = matrix.length;
+  const bw = ts / n, bh = ts / n;
+  for (let ry = 0; ry < n; ry++) {
+    const row = matrix[ry];
+    for (let rx = 0; rx < n; rx++) {
+      const ch = row[rx];
+      if (ch === '.') continue;
+      activeCtx.fillStyle = (overrides && overrides[ch]) || PALETTE[ch];
+      activeCtx.fillRect(px + rx * bw - 0.5, py + ry * bh - 0.5, bw + 1, bh + 1);
     }
-    return;
   }
-  if (t === T.STEEL) {
-    ctx.fillStyle = COLORS.steelDark; ctx.fillRect(px, py, ts, ts);
-    ctx.fillStyle = COLORS.steel;
-    ctx.fillRect(px + 2, py + 2, ts - 4, ts - 4);
-    ctx.strokeStyle = COLORS.steelDark; ctx.lineWidth = Math.max(1, ts * 0.06);
-    ctx.strokeRect(px + ts * 0.2, py + ts * 0.2, ts * 0.6, ts * 0.6);
-    return;
-  }
-  if (t === T.BRICK) {
-    ctx.fillStyle = COLORS.brickDark; ctx.fillRect(px, py, ts, ts);
-    ctx.fillStyle = COLORS.brick;
-    ctx.fillRect(px + 1, py + 1, ts * 0.46, ts * 0.44);
-    ctx.fillRect(px + ts * 0.52, py + 1, ts * 0.46, ts * 0.44);
-    ctx.fillRect(px + ts * 0.26, py + ts * 0.52, ts * 0.46, ts * 0.44);
-    return;
-  }
-  if (t === T.BOULDER) {
-    const cx = px + ts / 2, cy = py + ts / 2, r = ts * 0.42;
-    const g = ctx.createRadialGradient(cx - r * 0.3, cy - r * 0.3, r * 0.1, cx, cy, r);
-    g.addColorStop(0, COLORS.boulderHi); g.addColorStop(1, COLORS.boulderDark);
-    ctx.fillStyle = g;
-    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
-    return;
-  }
+}
+
+const DIRT_FLECKS = [
+  [[2, 1], [5, 3], [1, 5], [6, 6]],
+  [[4, 0], [0, 3], [6, 2], [3, 6], [5, 7]],
+  [[1, 1], [6, 1], [3, 4], [1, 6], [5, 5]],
+];
+function drawDirt(px, py, ts, gx, gy) {
+  activeCtx.fillStyle = PALETTE.o1;
+  activeCtx.fillRect(px, py, ts, ts);
+  const variant = DIRT_FLECKS[Math.abs(gx * 7 + gy * 13) % DIRT_FLECKS.length];
+  const b = ts / 8;
+  activeCtx.fillStyle = PALETTE.o2;
+  for (const [fx, fy] of variant) activeCtx.fillRect(px + fx * b, py + fy * b, b * 1.3, b * 1.3);
+}
+
+const DIAMOND_SHIMMER = [
+  { C: '#3be2ff', c: '#0f8fb0', W: '#f2ffff' },
+  { C: '#5cf0d0', c: '#0fb08f', W: '#ffffff' },
+  { C: '#8fd9ff', c: '#2f7fcf', W: '#f2ffff' },
+];
+
+function drawTile(t, px, py, ts, frame, gx, gy) {
+  if (t === T.EMPTY) return;
+  if (t === T.DIRT) { drawDirt(px, py, ts, gx, gy); return; }
+  if (t === T.STEEL) { drawSprite(SPR.steel, px, py, ts); return; }
+  if (t === T.BRICK) { drawSprite(SPR.brick, px, py, ts); return; }
+  if (t === T.BOULDER) { drawSprite(SPR.boulder, px, py, ts); return; }
   if (t === T.DIAMOND) {
-    const cx = px + ts / 2, cy = py + ts / 2, r = ts * 0.38;
-    const glow = 0.7 + 0.3 * Math.sin(frame / 220 + px * 0.1);
-    ctx.save();
-    ctx.translate(cx, cy); ctx.rotate(Math.PI / 4);
-    const g = ctx.createLinearGradient(-r, -r, r, r);
-    g.addColorStop(0, COLORS.diamondHi); g.addColorStop(1, COLORS.diamond);
-    ctx.fillStyle = g; ctx.globalAlpha = glow;
-    ctx.fillRect(-r * 0.7, -r * 0.7, r * 1.4, r * 1.4);
-    ctx.restore();
+    const shimmer = DIAMOND_SHIMMER[Math.floor(frame / 200 + gx + gy) % DIAMOND_SHIMMER.length];
+    drawSprite(SPR.diamond, px, py, ts, shimmer);
     return;
   }
-  if (t === T.EXIT_CLOSED || t === T.EXIT_OPEN) {
-    const open = t === T.EXIT_OPEN;
-    ctx.fillStyle = open ? COLORS.exitOpen : COLORS.exitClosed;
-    ctx.globalAlpha = open ? (0.6 + 0.4 * Math.sin(frame / 150)) : 1;
-    ctx.fillRect(px + 2, py + 2, ts - 4, ts - 4);
-    ctx.globalAlpha = 1;
-    ctx.strokeStyle = '#000'; ctx.lineWidth = 2; ctx.strokeRect(px + 2, py + 2, ts - 4, ts - 4);
+  if (t === T.EXIT_CLOSED) { drawSprite(SPR.exitOff, px, py, ts); return; }
+  if (t === T.EXIT_OPEN) {
+    activeCtx.globalAlpha = 0.55 + 0.45 * Math.sin(frame / 150);
+    drawSprite(SPR.exitOn, px, py, ts);
+    activeCtx.globalAlpha = 1;
     return;
   }
   if (t === T.AMOEBA) {
-    const cx = px + ts / 2, cy = py + ts / 2;
-    const pulse = 0.75 + 0.25 * Math.sin(frame / 180 + (px + py) * 0.05);
-    ctx.fillStyle = COLORS.amoeba;
-    ctx.globalAlpha = pulse;
-    ctx.beginPath(); ctx.arc(cx, cy, ts * 0.44, 0, Math.PI * 2); ctx.fill();
-    ctx.globalAlpha = 1;
+    activeCtx.globalAlpha = 0.8 + 0.2 * Math.sin(frame / 180 + (gx + gy) * 0.6);
+    drawSprite(SPR.amoeba, px, py, ts);
+    activeCtx.globalAlpha = 1;
     return;
   }
 }
 
-function drawPlayer(px, py, ts) {
-  const cx = px + ts / 2, cy = py + ts / 2;
-  ctx.fillStyle = COLORS.player;
-  ctx.beginPath(); ctx.arc(cx, cy, ts * 0.4, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = '#3a2410';
-  const eyeOffX = player.facing === 'left' ? -ts * 0.12 : player.facing === 'right' ? ts * 0.12 : 0;
-  const eyeOffY = player.facing === 'up' ? -ts * 0.12 : player.facing === 'down' ? ts * 0.08 : 0;
-  ctx.beginPath();
-  ctx.arc(cx - ts * 0.12 + eyeOffX, cy - ts * 0.05 + eyeOffY, ts * 0.06, 0, Math.PI * 2);
-  ctx.arc(cx + ts * 0.12 + eyeOffX, cy - ts * 0.05 + eyeOffY, ts * 0.06, 0, Math.PI * 2);
-  ctx.fill();
+function drawPlayer(px, py, ts, frame) {
+  const walkFrame = Math.floor(frame / 260) % 2;
+  let matrix = player.facing === 'up' ? SPR.playerBack : (walkFrame ? SPR.playerFront2 : SPR.playerFront);
+  activeCtx.save();
+  if (player.facing === 'left') {
+    activeCtx.translate(px + ts, py); activeCtx.scale(-1, 1);
+    drawSprite(matrix, 0, 0, ts);
+  } else {
+    drawSprite(matrix, px, py, ts);
+  }
+  activeCtx.restore();
 }
 
 function drawEnemy(e, px, py, ts, frame) {
   const cx = px + ts / 2, cy = py + ts / 2;
-  const flick = 0.85 + 0.15 * Math.sin(frame / 60 + e.x * 3);
-  ctx.fillStyle = e.type === 'firefly' ? COLORS.firefly : COLORS.butterfly;
-  ctx.globalAlpha = flick;
+  activeCtx.save();
+  activeCtx.translate(cx, cy);
   if (e.type === 'firefly') {
-    ctx.beginPath(); ctx.arc(cx, cy, ts * 0.36, 0, Math.PI * 2); ctx.fill();
+    activeCtx.rotate(frame / 220);
+    drawSprite(SPR.firefly, -ts / 2, -ts / 2, ts);
   } else {
-    ctx.beginPath();
-    ctx.ellipse(cx - ts * 0.2, cy, ts * 0.22, ts * 0.32, 0, 0, Math.PI * 2);
-    ctx.ellipse(cx + ts * 0.2, cy, ts * 0.22, ts * 0.32, 0, 0, Math.PI * 2);
-    ctx.fill();
+    const flap = 0.75 + 0.25 * Math.sin(frame / 90 + e.x);
+    activeCtx.scale(flap, 1);
+    drawSprite(SPR.butterfly, -ts / 2, -ts / 2, ts);
   }
-  ctx.globalAlpha = 1;
+  activeCtx.restore();
 }
 
 function render(now) {
+  activeCtx = ctx;
   const frame = now;
   // smooth camera follow
   const targetX = clamp(player.x - viewport.cols / 2 + 0.5, 0, Math.max(0, W - viewport.cols));
@@ -637,7 +687,7 @@ function render(now) {
     for (let rx = -1; rx <= viewport.cols; rx++) {
       const gx = camCol + rx, gy = camRow + ry;
       if (!inBounds(gx, gy)) continue;
-      drawTile(grid[idxOf(gx, gy)], rx * ts + offX, ry * ts + offY, ts, frame);
+      drawTile(grid[idxOf(gx, gy)], rx * ts + offX, ry * ts + offY, ts, frame, gx, gy);
     }
   }
 
@@ -650,7 +700,7 @@ function render(now) {
 
   if (player.alive) {
     const rx = (player.x - camCol) * ts + offX, ry = (player.y - camRow) * ts + offY;
-    drawPlayer(rx, ry, ts);
+    drawPlayer(rx, ry, ts, frame);
   }
 
   // particles
@@ -690,6 +740,7 @@ function frameLoop(now) {
   }
 
   if (grid) render(now);
+  renderTitleArt(now);
 }
 requestAnimationFrame(frameLoop);
 
