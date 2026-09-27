@@ -74,10 +74,73 @@ function generateLevel(levelIndex) {
   }
 
   const reserved = new Set([idx(playerStart.x, playerStart.y), idx(exitPos.x, exitPos.y)]);
+
+  // ---- sealed brick treasure vaults: walled rooms with a single dug entrance,
+  // giving each cave deliberate hand-built-feeling structure instead of pure noise ----
+  const vaultOccupied = new Set();
+  function tryBuildVault() {
+    const w = 3 + Math.floor(rnd() * 2), h = 2 + Math.floor(rnd() * 2);
+    const vx = 2 + Math.floor(rnd() * Math.max(1, iw - w - 4));
+    const vy = 2 + Math.floor(rnd() * Math.max(1, ih - h - 4));
+    if (Math.abs(vx - playerStart.x) + Math.abs(vy - playerStart.y) < 4) return null;
+    if (Math.abs(vx - exitPos.x) + Math.abs(vy - exitPos.y) < 4) return null;
+    for (let y = vy - 1; y <= vy + h; y++)
+      for (let x = vx - 1; x <= vx + w; x++)
+        if (vaultOccupied.has(x + ',' + y) || !inInterior(x, y)) return null;
+    for (let y = vy - 1; y <= vy + h; y++)
+      for (let x = vx - 1; x <= vx + w; x++)
+        vaultOccupied.add(x + ',' + y);
+
+    const perimeter = [];
+    for (let x = vx - 1; x <= vx + w; x++) { perimeter.push([x, vy - 1]); perimeter.push([x, vy + h]); }
+    for (let y = vy; y < vy + h; y++) { perimeter.push([vx - 1, y]); perimeter.push([vx + w, y]); }
+    for (const [x, y] of perimeter) { grid[idx(x, y)] = T.BRICK; reserved.add(idx(x, y)); }
+
+    for (let y = vy; y < vy + h; y++)
+      for (let x = vx; x < vx + w; x++) { grid[idx(x, y)] = T.DIRT; reserved.add(idx(x, y)); }
+
+    const entrances = perimeter.filter(([x, y]) =>
+      !((x === vx - 1 || x === vx + w) && (y === vy - 1 || y === vy + h)));
+    const [ex, ey] = entrances[Math.floor(rnd() * entrances.length)];
+    grid[idx(ex, ey)] = T.DIRT;
+    reserved.delete(idx(ex, ey));
+
+    return { x: vx, y: vy, w, h };
+  }
+
+  const vaultCount = 1 + Math.floor(levelIndex / 2);
+  const vaults = [];
+  for (let v = 0; v < vaultCount; v++) {
+    for (let attempt = 0; attempt < 10; attempt++) {
+      const vault = tryBuildVault();
+      if (vault) { vaults.push(vault); break; }
+    }
+  }
+
+  // a few standalone brick nubs to break up open dirt into corridors, like hand-placed obstacles
+  const pillarCount = 3 + levelIndex * 2;
+  for (let p = 0; p < pillarCount; p++) {
+    const x = 1 + Math.floor(rnd() * iw), y = 1 + Math.floor(rnd() * ih);
+    const i = idx(x, y);
+    if (reserved.has(i) || grid[i] !== T.DIRT) continue;
+    if (Math.abs(x - playerStart.x) + Math.abs(y - playerStart.y) < 3) continue;
+    if (Math.abs(x - exitPos.x) + Math.abs(y - exitPos.y) < 3) continue;
+    grid[i] = T.BRICK;
+    const dir = TURN_ORDER[Math.floor(rnd() * 4)];
+    const nx = x + dir[0], ny = y + dir[1];
+    if (inInterior(nx, ny) && grid[idx(nx, ny)] === T.DIRT && !reserved.has(idx(nx, ny))) {
+      grid[idx(nx, ny)] = T.BRICK;
+    }
+  }
+
+  // round objects (boulders/diamonds) always need solid ground beneath them at
+  // generation time — otherwise they'd start falling the instant the level
+  // loads, which can drop them on the player without any warning
+  const hasSupport = (x, y) => grid[idx(x, y + 1)] !== T.EMPTY;
   const placeRandom = (tile, count, allowedTiles) => {
     let placed = 0, attempts = 0;
     const cells = [];
-    while (placed < count && attempts < count * 40) {
+    while (placed < count && attempts < count * 60) {
       attempts++;
       const x = 1 + Math.floor(rnd() * iw);
       const y = 1 + Math.floor(rnd() * ih);
@@ -85,6 +148,7 @@ function generateLevel(levelIndex) {
       if (reserved.has(i)) continue;
       if (Math.abs(x - playerStart.x) + Math.abs(y - playerStart.y) < 3) continue;
       if (!allowedTiles.includes(grid[i])) continue;
+      if (!hasSupport(x, y)) continue;
       grid[i] = tile;
       cells.push({ x, y });
       placed++;
@@ -103,6 +167,20 @@ function generateLevel(levelIndex) {
     placeRandom(T.DIAMOND, diamondsNeeded - diamondCells.length, [T.DIRT]);
   }
 
+  // bonus treasure tucked inside the sealed vaults (never required, always reachable
+  // once dug open, and always resting on the vault's own dirt floor)
+  for (const v of vaults) {
+    const cells = [];
+    for (let y = v.y; y < v.y + v.h; y++)
+      for (let x = v.x; x < v.x + v.w; x++) cells.push([x, y]);
+    for (let i = cells.length - 1; i > 0; i--) {
+      const j = Math.floor(rnd() * (i + 1));
+      [cells[i], cells[j]] = [cells[j], cells[i]];
+    }
+    const n = Math.min(cells.length, 2 + Math.floor(rnd() * 2));
+    for (let i = 0; i < n; i++) grid[idx(cells[i][0], cells[i][1])] = T.DIAMOND;
+  }
+
   grid[idx(exitPos.x, exitPos.y)] = T.EXIT_CLOSED;
   grid[idx(playerStart.x, playerStart.y)] = T.EMPTY;
 
@@ -110,8 +188,33 @@ function generateLevel(levelIndex) {
   const butterflyCount = levelIndex >= 2 ? 1 + Math.floor((levelIndex - 2) / 2) : 0;
   const hasAmoeba = levelIndex >= 3;
 
+  // Monsters can only move through already-open (EMPTY) cells — they can't dig.
+  // So what actually determines how fast one can reach the player at level start
+  // isn't straight-line distance, it's the number of open-tile hops between them.
+  // A short as-the-crow-flies distance across solid dirt is perfectly safe; a long
+  // one through a connected tunnel is not. Measure the real thing with a BFS.
+  const emptyDist = new Int32Array(W * H).fill(-1);
+  {
+    const startI = idx(playerStart.x, playerStart.y);
+    emptyDist[startI] = 0;
+    const qx = [playerStart.x], qy = [playerStart.y];
+    let head = 0;
+    while (head < qx.length) {
+      const cx = qx[head], cy = qy[head]; head++;
+      const d = emptyDist[idx(cx, cy)];
+      for (const [dx, dy] of TURN_ORDER) {
+        const nx = cx + dx, ny = cy + dy;
+        if (!inInterior(nx, ny)) continue;
+        const ni = idx(nx, ny);
+        if (grid[ni] !== T.EMPTY || emptyDist[ni] !== -1) continue;
+        emptyDist[ni] = d + 1;
+        qx.push(nx); qy.push(ny);
+      }
+    }
+  }
+
   const takenSpots = new Set();
-  const farSpots = (count, minDist) => {
+  const farSpots = (count, minHops) => {
     const spots = [];
     let attempts = 0;
     while (spots.length < count && attempts < 400) {
@@ -120,18 +223,19 @@ function generateLevel(levelIndex) {
       const y = 1 + Math.floor(rnd() * ih);
       const i = idx(x, y);
       if (grid[i] !== T.EMPTY || takenSpots.has(i)) continue;
-      if (Math.abs(x - playerStart.x) + Math.abs(y - playerStart.y) < minDist) continue;
+      const hops = emptyDist[i];
+      if (hops !== -1 && hops < minHops) continue; // -1 means no open path at all yet: always safe
       takenSpots.add(i);
       spots.push({ x, y });
     }
     return spots;
   };
 
-  const fireflySpots = farSpots(fireflyCount, 6);
-  const butterflySpots = farSpots(butterflyCount, 6);
+  const fireflySpots = farSpots(fireflyCount, 14);
+  const butterflySpots = farSpots(butterflyCount, 14);
   let amoebaSeed = null;
   if (hasAmoeba) {
-    const s = farSpots(1, 5)[0];
+    const s = farSpots(1, 10)[0];
     if (s) { amoebaSeed = s; grid[idx(s.x, s.y)] = T.AMOEBA; }
   }
 
@@ -839,6 +943,10 @@ window.__rockford = {
   gotoLevel(i) { state.levelIndex = i; state.lives = MAX_LIVES; state.score = 0; loadLevel(i); resizeCanvas(); actuallyStartLevel(); },
   kill(reason) { killPlayer(reason || 'debug'); },
   get exitPos() { return level.exitPos; },
+  get grid() { return grid; },
+  get W() { return W; },
+  get H() { return H; },
+  get T() { return T; },
 };
 
 /* ---------------- Boot ---------------- */
