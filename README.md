@@ -52,7 +52,7 @@ mobiele device-toolbar voor een preview.
 
 ## Besturing
 
-- **Mobiel:** het D-pad onderin het scherm (duwen op een rotsblok = duwen,
+- **Mobiel:** het D-pad onderin het scherm (lopen tegen een rotsblok = duwen,
   lopen tegen aarde = graven).
 - **Desktop (voor testen):** pijltjestoetsen of WASD, `Esc`/`P` voor pauze.
 

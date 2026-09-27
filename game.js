@@ -318,7 +318,7 @@ function updatePhysics() {
 
       if (belowTile === T.EMPTY) {
         if (player.x === x && player.y === y + 1) {
-          killPlayer('verpletterd door een rotsblok');
+          killPlayer('door een vallend rotsblok');
           continue;
         }
         const enemy = entityAt(x, y + 1);
@@ -415,7 +415,7 @@ function updateAmoeba() {
         grid[idxOf(nx, ny)] = T.AMOEBA;
         amoeba.add(idxOf(nx, ny));
         grew = true;
-        if (player.alive && player.x === nx && player.y === ny) killPlayer('opgeslokt door de amoebe');
+        if (player.alive && player.x === nx && player.y === ny) killPlayer('door de amoebe');
         break;
       }
     }
@@ -441,7 +441,7 @@ function tick() {
   }
 
   timeLeftSec = Math.max(0, Math.ceil((timeLimitMs - (performance.now() - levelStartMs)) / 1000));
-  if (timeLeftSec <= 0 && player.alive) killPlayer('de tijd is op');
+  if (timeLeftSec <= 0 && player.alive) killPlayer('omdat de tijd op is');
 
   if (!player.alive) { onPlayerDeath(); }
   updateHud();
@@ -456,14 +456,14 @@ function onPlayerDeath() {
     if (state.lives <= 0) {
       gameOverFinal = true;
       showScreen('screen-over');
-      document.getElementById('over-title').textContent = 'Game Over';
+      document.getElementById('over-title').textContent = 'Spel voorbij';
       document.getElementById('over-stats').textContent =
         `Gestorven ${gameOverReason}.\nScore: ${state.score}`;
       document.getElementById('btn-retry').textContent = '↺ Opnieuw beginnen';
     } else {
       gameOverFinal = false;
       showScreen('screen-over');
-      document.getElementById('over-title').textContent = `Nog ${state.lives} leven over`;
+      document.getElementById('over-title').textContent = `Nog ${state.lives} ${state.lives === 1 ? 'leven' : 'levens'} over`;
       document.getElementById('over-stats').textContent = `Gestorven ${gameOverReason}.`;
       document.getElementById('btn-retry').textContent = '↺ Doorgaan';
     }
