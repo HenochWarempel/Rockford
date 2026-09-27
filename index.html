@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#1a120c">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Rockford">
+<title>Rockford</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+
+  <div id="hud">
+    <div class="hud-item" id="hud-diamonds">💎 0/0</div>
+    <div class="hud-item" id="hud-score">★ 0</div>
+    <div class="hud-item" id="hud-time">⏱ 0</div>
+    <div class="hud-item" id="hud-lives">♥ 3</div>
+  </div>
+
+  <div id="stage">
+    <canvas id="game"></canvas>
+    <div id="toast"></div>
+  </div>
+
+  <div id="controls">
+    <div id="dpad">
+      <button class="dbtn" id="btn-up" data-dir="up" aria-label="Omhoog">▲</button>
+      <button class="dbtn" id="btn-left" data-dir="left" aria-label="Links">◀</button>
+      <button class="dbtn" id="btn-down" data-dir="down" aria-label="Omlaag">▼</button>
+      <button class="dbtn" id="btn-right" data-dir="right" aria-label="Rechts">▶</button>
+      <div class="dcenter"></div>
+    </div>
+    <button id="btn-pause" aria-label="Pauze">⏸</button>
+  </div>
+
+  <!-- Title screen -->
+  <div class="overlay" id="screen-title">
+    <h1>ROCKFORD</h1>
+    <p class="subtitle">een Boulder&nbsp;Dash&#8209;eerbetoon</p>
+    <div class="menu">
+      <button class="menu-btn" id="btn-start">▶ Spelen</button>
+      <button class="menu-btn" id="btn-howto">? Hoe te spelen</button>
+    </div>
+    <p class="hint">Verzamel diamanten, ontwijk vallende rotsen en bereik de uitgang.</p>
+  </div>
+
+  <!-- How to play -->
+  <div class="overlay hidden" id="screen-howto">
+    <h2>Hoe te spelen</h2>
+    <ul class="howto-list">
+      <li>💎 Verzamel genoeg diamanten om de uitgang te openen.</li>
+      <li>🪨 Duw rotsblokken opzij, maar pas op: ze vallen en verpletteren je.</li>
+      <li>⛏ Graaf door aarde door er tegenaan te lopen.</li>
+      <li>🔥 Vlinders en vuurvliegjes zijn dodelijk — laat een rots erop vallen.</li>
+      <li>🟢 Amoebe groeit razendsnel en is ook dodelijk.</li>
+      <li>⏱ Haast je — de tijd loopt door!</li>
+    </ul>
+    <button class="menu-btn" id="btn-howto-back">Terug</button>
+  </div>
+
+  <!-- Level intro -->
+  <div class="overlay hidden" id="screen-level">
+    <h2 id="level-title">GROT A</h2>
+    <p id="level-goal">Verzamel 10 diamanten</p>
+    <button class="menu-btn" id="btn-level-go">Start</button>
+  </div>
+
+  <!-- Pause -->
+  <div class="overlay hidden" id="screen-pause">
+    <h2>Gepauzeerd</h2>
+    <div class="menu">
+      <button class="menu-btn" id="btn-resume">▶ Verder</button>
+      <button class="menu-btn" id="btn-restart">↺ Grot opnieuw</button>
+      <button class="menu-btn" id="btn-quit">■ Naar menu</button>
+    </div>
+  </div>
+
+  <!-- Level complete -->
+  <div class="overlay hidden" id="screen-clear">
+    <h2>Grot geklaard!</h2>
+    <p id="clear-stats"></p>
+    <button class="menu-btn" id="btn-next">Volgende grot ▶</button>
+  </div>
+
+  <!-- Game over -->
+  <div class="overlay hidden" id="screen-over">
+    <h2 id="over-title">Game Over</h2>
+    <p id="over-stats"></p>
+    <button class="menu-btn" id="btn-retry">↺ Opnieuw</button>
+    <button class="menu-btn" id="btn-menu">■ Naar menu</button>
+  </div>
+
+  <!-- All levels done -->
+  <div class="overlay hidden" id="screen-win">
+    <h2>🏆 Alle grotten gehaald!</h2>
+    <p id="win-stats"></p>
+    <button class="menu-btn" id="btn-win-menu">■ Naar menu</button>
+  </div>
+
+</div>
+<script src="game.js"></script>
+</body>
+</html>
